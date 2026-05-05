@@ -1,0 +1,40 @@
+# ================================================================
+#  dbt_project.yml
+#  Main configuration file for the AI E-Commerce Ops Monitor dbt project
+# ================================================================
+
+name: 'ecommerce_ops'
+version: '1.0.0'
+config-version: 2
+
+# Profile name must match profiles.yml
+profile: 'ecommerce_ops'
+
+# Where your models live
+model-paths:       ["models"]
+analysis-paths:    ["analyses"]
+test-paths:        ["tests"]
+seed-paths:        ["seeds"]
+macro-paths:       ["macros"]
+snapshot-paths:    ["snapshots"]
+
+# Where compiled + run files go
+target-path:  "target"
+clean-targets: ["target", "dbt_packages"]
+
+# ----------------------------------------------------------------
+#  MODEL CONFIGURATIONS
+#  Controls materialization for each layer
+# ----------------------------------------------------------------
+models:
+  ecommerce_ops:
+
+    # STAGING layer — views (cheap, always fresh)
+    staging:
+      +materialized: view
+      +schema: STAGING
+
+    # MARTS layer — tables (fast reads for Power BI)
+    marts:
+      +materialized: table
+      +schema: MARTS

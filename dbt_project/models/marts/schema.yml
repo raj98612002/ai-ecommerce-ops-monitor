@@ -1,0 +1,65 @@
+﻿version: 2
+
+models:
+
+  - name: mart_order_summary
+    description: "Daily order and revenue summary by city"
+    columns:
+      - name: order_date
+        tests: [not_null]
+      - name: city
+        tests: [not_null]
+      - name: total_orders
+        tests: [not_null]
+      - name: total_revenue
+        tests: [not_null]
+
+  - name: mart_payment_health
+    description: "Daily payment health by method"
+    columns:
+      - name: payment_date
+        tests: [not_null]
+      - name: payment_method
+        tests: [not_null]
+      - name: health_status
+        tests:
+          - accepted_values:
+              values: ['healthy', 'warning', 'critical']
+
+  - name: mart_delivery_performance
+    description: "Daily delivery performance by city and partner"
+    columns:
+      - name: delivery_date
+        tests: [not_null]
+      - name: city
+        tests: [not_null]
+      - name: health_status
+        tests:
+          - accepted_values:
+              values: ['healthy', 'warning', 'critical']
+
+  - name: mart_complaint_insights
+    description: "Daily complaint breakdown by category and severity"
+    columns:
+      - name: complaint_date
+        tests: [not_null]
+      - name: total_complaints
+        tests: [not_null]
+
+  - name: mart_ai_diagnosis_summary
+    description: "Daily AI Pipeline Doctor performance summary"
+    columns:
+      - name: run_date
+        tests: [unique, not_null]
+      - name: pipeline_health_score
+        tests: [not_null]
+
+  - name: mart_business_health_daily
+    description: "Master daily KPI table joining all data sources"
+    columns:
+      - name: business_date
+        tests: [unique, not_null]
+      - name: overall_status
+        tests:
+          - accepted_values:
+              values: ['healthy', 'degraded', 'critical']

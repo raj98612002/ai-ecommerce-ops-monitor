@@ -1,0 +1,75 @@
+﻿version: 2
+
+models:
+
+  - name: stg_orders
+    description: "Cleaned orders - one row per order"
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+      - name: customer_id
+        tests: [not_null]
+      - name: order_ts
+        tests: [not_null]
+      - name: order_amount
+        tests: [not_null]
+      - name: city
+        tests: [not_null]
+
+  - name: stg_payments
+    description: "Cleaned payments - one row per payment"
+    columns:
+      - name: payment_id
+        tests: [unique, not_null]
+      - name: order_id
+        tests: [not_null]
+      - name: payment_ts
+        tests: [not_null]
+      - name: is_success
+        tests: [not_null]
+      - name: is_failed
+        tests: [not_null]
+
+  - name: stg_deliveries
+    description: "Cleaned deliveries - one row per delivery"
+    columns:
+      - name: delivery_id
+        tests: [unique, not_null]
+      - name: order_id
+        tests: [not_null]
+      - name: city
+        tests: [not_null]
+      - name: is_delayed
+        tests: [not_null]
+
+  - name: stg_complaints
+    description: "Cleaned complaints with AI classifications"
+    columns:
+      - name: complaint_id
+        tests: [unique, not_null]
+      - name: order_id
+        tests: [not_null]
+      - name: severity_score
+        tests: [not_null]
+
+  - name: stg_refunds
+    description: "Cleaned refund records"
+    columns:
+      - name: refund_id
+        tests: [unique, not_null]
+      - name: order_id
+        tests: [not_null]
+      - name: refund_amount
+        tests: [not_null]
+
+  - name: stg_ai_diagnosis
+    description: "Cleaned AI Pipeline Doctor diagnoses"
+    columns:
+      - name: diagnosis_id
+        tests: [unique, not_null]
+      - name: run_timestamp
+        tests: [not_null]
+      - name: severity
+        tests: [not_null]
+      - name: confidence
+        tests: [not_null]

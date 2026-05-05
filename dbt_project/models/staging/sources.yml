@@ -1,0 +1,119 @@
+# ================================================================
+#  models/staging/sources.yml
+#  Defines your RAW Snowflake tables as dbt sources
+#
+#  What is a source?
+#    A source = a table that dbt did NOT create.
+#    In your case, snowflake_loader.py loaded these tables.
+#    dbt reads them, transforms them, and writes new tables.
+# ================================================================
+
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw e-commerce data loaded from PostgreSQL by snowflake_loader.py"
+    database: ECOMMERCE_OPS_DB
+    schema: RAW
+
+    tables:
+
+      # --------------------------------------------------------
+      - name: RAW_ORDERS
+        description: "Every order placed in the e-commerce system"
+        columns:
+          - name: ORDER_ID
+            description: "Unique order identifier"
+            tests:
+              - unique
+              - not_null
+          - name: CUSTOMER_ID
+            tests: [not_null]
+          - name: ORDER_TS
+            description: "Timestamp when order was placed"
+            tests: [not_null]
+          - name: ORDER_AMOUNT
+            description: "Total order value in INR"
+          - name: ORDER_STATUS
+            description: "pending, confirmed, shipped, delivered, cancelled"
+          - name: CITY
+
+      # --------------------------------------------------------
+      - name: RAW_PAYMENTS
+        description: "Every payment attempt for every order"
+        columns:
+          - name: PAYMENT_ID
+            tests: [unique, not_null]
+          - name: ORDER_ID
+            tests: [not_null]
+          - name: PAYMENT_TS
+            tests: [not_null]
+          - name: PAYMENT_METHOD
+            description: "upi, credit_card, debit_card, netbanking, cod, wallet"
+          - name: PAYMENT_STATUS
+            description: "success, failed, pending"
+          - name: AMOUNT
+          - name: FAILURE_REASON
+
+      # --------------------------------------------------------
+      - name: RAW_DELIVERIES
+        description: "Delivery records for each order"
+        columns:
+          - name: DELIVERY_ID
+            tests: [unique, not_null]
+          - name: ORDER_ID
+            tests: [not_null]
+          - name: CITY
+          - name: DELIVERY_PARTNER
+          - name: PROMISED_MINUTES
+            description: "Expected delivery time in minutes"
+          - name: ACTUAL_MINUTES
+            description: "Actual delivery time in minutes"
+          - name: DELIVERY_STATUS
+
+      # --------------------------------------------------------
+      - name: RAW_COMPLAINTS
+        description: "Customer complaints with AI classification"
+        columns:
+          - name: COMPLAINT_ID
+            tests: [unique, not_null]
+          - name: ORDER_ID
+            tests: [not_null]
+          - name: COMPLAINT_TS
+            tests: [not_null]
+          - name: COMPLAINT_TEXT
+          - name: AI_CATEGORY
+            description: "Category assigned by AI: delivery, payment, product, support"
+          - name: AI_SEVERITY
+            description: "Severity: low, medium, high, critical"
+          - name: CUSTOMER_EMOTION
+          - name: BUSINESS_IMPACT
+
+      # --------------------------------------------------------
+      - name: RAW_REFUNDS
+        description: "Refund records"
+        columns:
+          - name: REFUND_ID
+            tests: [unique, not_null]
+          - name: ORDER_ID
+            tests: [not_null]
+          - name: REFUND_TS
+          - name: REFUND_AMOUNT
+          - name: REFUND_REASON
+
+      # --------------------------------------------------------
+      - name: AI_PIPELINE_DIAGNOSIS
+        description: "AI Pipeline Doctor diagnosis history"
+        columns:
+          - name: DIAGNOSIS_ID
+            description: "Unique diagnosis identifier"
+            tests:
+              - unique
+              - not_null
+          - name: RUN_TIMESTAMP
+            tests: [not_null]
+          - name: STATUS
+          - name: SEVERITY
+          - name: CONFIDENCE
+          - name: ISSUE_SUMMARY
+          - name: SOURCE
