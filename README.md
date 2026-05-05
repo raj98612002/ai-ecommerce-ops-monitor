@@ -1,267 +1,471 @@
-# AI E-commerce Operations Monitor
+# AI E-Commerce Operations Monitor
 
-A live data engineering portfolio project using Kafka, PostgreSQL, Airflow, Snowflake, dbt, Power BI, and AI.
+A real-time data engineering pipeline that continuously monitors e-commerce operations — tracking orders, payments, deliveries, complaints, and refunds — and deploys an AI-powered diagnostic layer to detect anomalies, identify root causes, and surface actionable insights across a fully integrated analytics stack.
 
-## One-line resume description
-Built an AI-powered e-commerce operations monitor that streams live orders, payments, deliveries, refunds, and complaints through Kafka, stores raw data in PostgreSQL, loads curated data into Snowflake, transforms it with dbt, and uses an LLM-based Pipeline Doctor to detect anomalies, explain root causes, and suggest fixes.
+---
 
 ## Architecture
 
-```text
-Fake E-commerce Events
-        ↓
-Kafka Producer
-        ↓
-Kafka Topics
-orders_topic, payments_topic, delivery_topic, refunds_topic, complaints_topic
-        ↓
-Kafka Consumer
-        ↓
-PostgreSQL RAW tables
-        ↓
-Airflow DAG every 15 min
-        ↓
-CSV/S3-style raw export → Snowflake RAW
-        ↓
-dbt STAGING + MARTS
-        ↓
-Power BI Dashboard
-        ↓
-AI Pipeline Doctor + Telegram Alert
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      AI E-COMMERCE OPERATIONS MONITOR                        │
+│                                                                               │
+│   ┌─────────────┐     ┌──────────────┐     ┌────────────────────────────┐   │
+│   │   Kafka     │────▶│  PostgreSQL  │────▶│     Apache Airflow         │   │
+│   │  (5 topics) │     │ (Operational)│     │  DAG: every 15 minutes     │   │
+│   └─────────────┘     └──────────────┘     └────────────┬───────────────┘   │
+│                                                          │                    │
+│                              ┌───────────────────────────┘                   │
+│                              ▼                                                │
+│                   ┌─────────────────────┐                                    │
+│                   │   AI Pipeline       │  GPT-4o-mini anomaly diagnosis     │
+│                   │   Doctor            │  Z-score feature detection          │
+│                   │                     │  Rule-based fallback engine         │
+│                   └──────────┬──────────┘  Persisted audit trail             │
+│                              │                                                │
+│               ┌──────────────┴──────────────┐                               │
+│               ▼                             ▼                                │
+│       ┌──────────────┐            ┌──────────────────┐                      │
+│       │   AWS S3     │            │    Snowflake      │                      │
+│       │  (Parquet)   │            │  Data Warehouse   │                      │
+│       │ date-part.   │            │  RAW → STAGING    │                      │
+│       └──────────────┘            │      → MARTS      │                      │
+│                                   └────────┬─────────┘                      │
+│                                            │                                 │
+│                                   ┌────────▼─────────┐                      │
+│                                   │       dbt         │                      │
+│                                   │  12 models        │                      │
+│                                   │  69 data tests    │                      │
+│                                   └────────┬─────────┘                      │
+│                                            │                                 │
+│                                   ┌────────▼─────────┐                      │
+│                                   │    Power BI       │                      │
+│                                   │  3-page dashboard │                      │
+│                                   │  Live Snowflake   │                      │
+│                                   └──────────────────┘                      │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Tools used
+**Airflow DAG Task Flow:**
+```
+check_postgres
+      │
+      ├──▶ check_recent_orders ──┐
+      │                          ├──▶ run_ai_doctor ──▶ s3_backup
+      └──▶ check_payment_failure ┘
+```
 
-- Python
-- Kafka
-- PostgreSQL
-- Airflow
-- Snowflake
-- dbt
-- Power BI
-- OpenAI / LLM
-- Telegram alerts
+---
 
-## Folder structure
+## What This System Does
 
-```text
+This platform ingests high-volume e-commerce event streams across five operational domains — orders, payments, deliveries, complaints, and refunds — and runs a full analytics and AI monitoring stack on top of them.
+
+Every 15 minutes, the Airflow DAG wakes up, checks pipeline health metrics, feeds them into an AI diagnostic engine backed by GPT-4o-mini, and persists structured diagnoses with severity scores, root cause analysis, and suggested remediation SQL. All raw data is simultaneously loaded into Snowflake, transformed through a medallion architecture via dbt, and backed up to AWS S3 as date-partitioned Parquet files — ready for downstream analytics in Power BI.
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Ingestion** | Apache Kafka + Zookeeper | Real-time event streaming (5 topics) |
+| **Operational DB** | PostgreSQL 15 | Raw event storage, AI diagnosis audit trail |
+| **Orchestration** | Apache Airflow 2.9 | Pipeline scheduling, retry logic, XCom passing |
+| **AI / LLM** | OpenAI GPT-4o-mini | Anomaly diagnosis, root cause analysis |
+| **Data Warehouse** | Snowflake | Cloud-scale analytical storage |
+| **Transformation** | dbt 1.11 + dbt-snowflake | Medallion architecture, data quality testing |
+| **Cloud Backup** | AWS S3 + PyArrow | Date-partitioned Parquet archival |
+| **Visualization** | Power BI Desktop | Live-connected operational dashboards |
+| **Containerization** | Docker + Docker Compose | 8-service local stack, one-command startup |
+| **Language** | Python 3.11 | End-to-end pipeline, AI layer, loaders |
+
+---
+
+## Key Features
+
+**Real-time streaming pipeline**
+Kafka producer emits events across five topics simultaneously. A dedicated consumer reads and persists them to PostgreSQL with deduplication and error handling.
+
+**Airflow orchestration with parallel execution**
+The DAG runs `check_recent_orders` and `check_payment_failure` in parallel, then fans into the AI doctor task. XCom passes metrics between tasks. Retry logic with 2-minute backoff protects against transient failures.
+
+**AI Pipeline Doctor**
+A four-stage AI system extracts 15+ operational metrics, runs z-score anomaly detection, calls GPT-4o-mini for structured diagnosis, and persists results with a full audit trail including confidence scores, LLM provider, latency, and alert fingerprint for deduplication.
+
+**Rule-based fallback engine**
+When the LLM is unavailable, a deterministic fallback generates diagnoses from raw metric thresholds — ensuring the pipeline never goes silent regardless of external API availability.
+
+**Medallion architecture with dbt**
+Twelve dbt models transform raw Snowflake tables through staging views into business-ready mart tables. Sixty-nine automated tests validate uniqueness, nullability, and accepted values across all layers.
+
+**AWS S3 Parquet archival**
+All six raw tables are serialized to Parquet and uploaded to S3 with year/month/day partitioning, making them queryable directly via Athena and compatible with any Spark or Iceberg-based downstream system.
+
+**Power BI live dashboards**
+Three dashboard pages connect directly to Snowflake mart tables — no scheduled exports, no stale data. Covers executive KPIs, operational health, and AI diagnosis trends.
+
+---
+
+## Project Structure
+
+```
 ai_ecommerce_ops_monitor/
-├── producers/                 # Kafka event generator
-├── consumers/                 # Kafka to Postgres consumer
-├── ai/                        # AI complaint classifier + pipeline doctor
-├── loaders/                   # Postgres export + Snowflake loader
-├── airflow/dags/              # Airflow DAG
-├── dbt_project/               # dbt staging and mart models
-├── sql/                       # PostgreSQL init tables
-├── config/                    # Kafka topics
-├── scripts/                   # Local run scripts
-├── data/raw/                  # Local raw exports
-└── dashboard/                 # Power BI screenshots or pbix later
+│
+├── ai/
+│   ├── feature_builder.py          # Extracts 15+ metrics from PostgreSQL
+│   ├── anomaly_detector.py         # Z-score detection on operational metrics
+│   ├── llm_engine.py               # GPT-4o-mini wrapper with JSON validation
+│   ├── pipeline_doctor.py          # Main orchestrator: features → anomalies → LLM → persist
+│   ├── decision_engine.py          # Alert deduplication via fingerprinting
+│   ├── persistence.py              # Writes structured diagnoses to PostgreSQL
+│   └── config.py                   # AIConfig dataclass reading env vars
+│
+├── airflow/
+│   └── dags/
+│       └── ecommerce_ops_pipeline.py   # Main DAG: 5 tasks, parallel execution
+│
+├── producers/
+│   └── ecommerce_event_producer.py     # Kafka producer across 5 topics
+│
+├── consumers/
+│   └── kafka_to_postgres_consumer.py   # Kafka → PostgreSQL consumer
+│
+├── loaders/
+│   ├── snowflake_loader.py             # PostgreSQL → Snowflake batch loader
+│   └── s3_backup.py                    # PostgreSQL → Parquet → S3 (date-partitioned)
+│
+├── dbt_project/
+│   ├── dbt_project.yml
+│   ├── packages.yml
+│   └── models/
+│       ├── staging/                    # 6 views: light cleaning, type casting
+│       │   ├── sources.yml
+│       │   ├── schema.yml
+│       │   ├── stg_orders.sql
+│       │   ├── stg_payments.sql
+│       │   ├── stg_deliveries.sql
+│       │   ├── stg_complaints.sql
+│       │   ├── stg_refunds.sql
+│       │   └── stg_ai_diagnosis.sql
+│       └── marts/                      # 6 tables: business logic, aggregations
+│           ├── schema.yml
+│           ├── mart_order_summary.sql
+│           ├── mart_payment_health.sql
+│           ├── mart_delivery_performance.sql
+│           ├── mart_complaint_insights.sql
+│           ├── mart_ai_diagnosis_summary.sql
+│           └── mart_business_health_daily.sql
+│
+├── config/
+│   └── topics.py                   # Kafka topic definitions
+│
+├── sql/
+│   ├── init_postgres.sql           # Schema initialization
+│   └── migrate_ai_pipeline_diagnosis.sql
+│
+├── docker-compose.yml              # 8 services: Kafka, Zookeeper, PostgreSQL,
+│                                   # Airflow webserver/scheduler/init, Kafka UI
+├── requirements.txt
+├── .env.example
+└── README.md
 ```
 
-## What makes this project unique
+---
 
-Most beginner projects are:
+## Data Models
 
-```text
-Data → Dashboard
+### PostgreSQL (Operational Layer)
+
+| Table | Description |
+|---|---|
+| `raw_orders` | Order events with status, amount, city, timestamp |
+| `raw_payments` | Payment events with method, status, failure reason |
+| `raw_deliveries` | Delivery records with promised vs actual minutes |
+| `raw_complaints` | Customer complaints with AI category and severity |
+| `raw_refunds` | Refund events with reason and amount |
+| `ai_pipeline_diagnosis` | Full AI audit trail with LLM metadata |
+
+### Snowflake (Analytical Layer)
+
+**Staging schema — `RAW_STAGING`** (views)
+
+| Model | Rows |
+|---|---|
+| `stg_orders` | 5,572 |
+| `stg_payments` | 5,572 |
+| `stg_deliveries` | 5,572 |
+| `stg_complaints` | 659 |
+| `stg_refunds` | ~800 |
+| `stg_ai_diagnosis` | 25 |
+
+**Marts schema — `RAW_MARTS`** (tables)
+
+| Model | Description | Rows |
+|---|---|---|
+| `mart_order_summary` | Daily orders and revenue by city | 24 |
+| `mart_payment_health` | Failure rates by method with health status | 15 |
+| `mart_delivery_performance` | Delay analysis by city and partner | 120 |
+| `mart_complaint_insights` | Complaint breakdown by AI category and severity | 25 |
+| `mart_ai_diagnosis_summary` | Daily AI Doctor performance metrics | 3 |
+| `mart_business_health_daily` | Master KPI table joining all domains | 3 |
+
+---
+
+## AI Pipeline Doctor
+
+```
+PostgreSQL metrics
+      │
+      ▼
+feature_builder.py          ← 15+ operational metrics extracted via SQL
+      │
+      ▼
+anomaly_detector.py         ← Z-score detection on key time-series metrics
+      │
+      ▼
+llm_engine.py               ← GPT-4o-mini call with structured JSON response
+      │                         Validates schema before accepting output
+      ▼
+decision_engine.py          ← Deduplicates alerts via fingerprinting
+      │
+      ▼
+persistence.py              ← Writes to ai_pipeline_diagnosis with full metadata
 ```
 
-This project is:
+**Each diagnosis record contains:**
 
-```text
-Live Events → Data Pipeline → dbt Tests → AI Diagnosis → Fix Suggestion → Dashboard Alert
-```
-
-The AI layer does not just generate text. It behaves like a junior data reliability engineer.
-
-## Main AI features
-
-### 1. AI Complaint Classifier
-Classifies customer complaints into:
-
-- payment_issue
-- late_delivery
-- wrong_product
-- refund_delay
-- app_issue
-- other
-
-### 2. AI Pipeline Doctor
-Checks:
-
-- Missing rows
-- Null columns
-- Duplicate records
-- High payment failure rate
-- High delivery delay rate
-- Complaint severity spike
-
-Returns:
-
-```json
+```python
 {
-  "status": "critical",
-  "issue_summary": "Payment failure rate is unusually high",
-  "root_cause": "Possible payment gateway issue or Kafka payment consumer bug",
-  "suggested_fix": "Check payments_consumer.py mapping and payment gateway logs",
-  "severity": "high"
+  "status":            "healthy | degraded | critical",
+  "severity":          0.0 - 1.0,
+  "confidence":        0.0 - 1.0,
+  "issue_summary":     "...",
+  "root_cause":        "...",
+  "business_impact":   "...",
+  "suggested_fix":     "...",
+  "investigation_sql": "SELECT ...",
+  "llm_provider":      "openai",
+  "llm_model":         "gpt-4o-mini",
+  "llm_latency_ms":    843,
+  "alert_fingerprint": "sha256_hash",
+  "source":            "llm | rule_based | dag_fallback"
 }
 ```
 
-### 3. Telegram Alert
-Sends the AI diagnosis when status is warning or critical.
+**Fallback chain:**
+`GPT-4o-mini` → `Rule-based engine` → `Emergency DAG fallback`
 
-## How to run locally
+The system never drops a diagnosis cycle regardless of LLM availability.
 
-### Step 1: Create environment file
+---
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your OpenAI and Snowflake details.
-
-### Step 2: Start Kafka and PostgreSQL
+## dbt Layer
 
 ```bash
-docker compose up -d
-```
-
-Kafka UI:
-
-```text
-http://localhost:8085
-```
-
-### Step 3: Install Python libraries
-
-```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Mac/Linux
-source venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-### Step 4: Start producing live e-commerce events
-
-```bash
-python producers/ecommerce_event_producer.py
-```
-
-Keep this terminal running.
-
-### Step 5: Start consuming Kafka events into PostgreSQL
-
-Open another terminal:
-
-```bash
-python consumers/kafka_to_postgres_consumer.py
-```
-
-Keep this terminal running.
-
-### Step 6: Run AI doctor locally
-
-Open another terminal:
-
-```bash
-python ai/pipeline_doctor.py
-```
-
-### Step 7: Export Postgres data to CSV
-
-```bash
-python loaders/postgres_to_csv.py
-```
-
-### Step 8: Load data to Snowflake
-
-```bash
-python loaders/snowflake_loader.py
-```
-
-### Step 9: Run dbt
-
-Copy `dbt_project/profiles.yml.example` to your local `~/.dbt/profiles.yml`, then edit credentials.
-
-```bash
-cd dbt_project
-dbt debug
+# Run all 12 models
 dbt run
+
+# Validate 69 data quality tests
 dbt test
+# Expected: PASS=69 WARN=0 ERROR=0
+
+# Generate documentation with lineage graph
+dbt docs generate && dbt docs serve
 ```
 
-## Airflow DAG
+**Test coverage includes:**
+- `unique` — primary key integrity across all models
+- `not_null` — required field validation
+- `accepted_values` — status fields constrained to known enumerations
+- `source` tests — raw table validation before transformation
 
-The DAG file is:
+---
 
-```text
-airflow/dags/ecommerce_ops_pipeline.py
+## AWS S3 Backup
+
+Raw tables are serialized to Parquet and uploaded with date-based partitioning:
+
+```
+s3://ecommerce-ops-raw-raj/
+├── raw_orders/
+│   └── year=2026/month=05/day=05/
+│       └── raw_orders_20260505_101400.parquet
+├── raw_payments/
+├── raw_deliveries/
+├── raw_complaints/
+├── raw_refunds/
+└── ai_pipeline_diagnosis/
 ```
 
-It runs every 15 minutes:
+Each file includes row count and backup timestamp in S3 object metadata. The structure is Athena-compatible and Iceberg-ready for future migration.
 
-```text
-export_postgres_to_csv
-→ ai_pipeline_doctor
-→ reload_diagnosis_csv
-→ load_to_snowflake
-→ run_dbt_models
-→ run_dbt_tests
+---
+
+## Setup
+
+### Prerequisites
+
+- Docker Desktop
+- Python 3.11
+- Snowflake account
+- OpenAI API key
+- AWS account with S3 access
+- Power BI Desktop
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/raj98612002/ai-ecommerce-ops-monitor.git
+cd ai-ecommerce-ops-monitor
+cp .env.example .env
+# Fill in .env with your credentials
 ```
 
-For a full Airflow Docker setup, mount this whole project to `/opt/airflow/project` and mount `airflow/dags` to Airflow's DAG folder.
+### 2. Python environments
 
-## Snowflake schemas
+```bash
+# Main environment
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
 
-This starter uses:
-
-```text
-ECOMMERCE_OPS_DB.RAW
-ECOMMERCE_OPS_DB.STAGING
-ECOMMERCE_OPS_DB.MARTS
+# dbt environment (isolated to avoid dependency conflicts)
+python -m venv dbt_venv
+dbt_venv\Scripts\activate
+pip install dbt-snowflake
 ```
 
-## Power BI dashboard pages
+### 3. Snowflake setup
 
-### Page 1: Executive Monitor
-- Total orders
-- Revenue
-- Failed payments
-- Refund amount
-- Complaint count
+```sql
+CREATE DATABASE ECOMMERCE_OPS_DB;
+CREATE SCHEMA ECOMMERCE_OPS_DB.RAW;
+CREATE SCHEMA ECOMMERCE_OPS_DB.RAW_STAGING;
+CREATE SCHEMA ECOMMERCE_OPS_DB.RAW_MARTS;
+```
 
-### Page 2: Payment Health
-- Success vs failed payments
-- Failure by payment method
-- Hourly failure trend
+### 4. dbt profile
 
-### Page 3: Delivery Health
-- Delayed deliveries
-- Delay by city
-- Average delivery time
+```bash
+cp dbt_project/profiles.yml.example ~/.dbt/profiles.yml
+# Fill in your Snowflake credentials
+```
 
-### Page 4: AI Pipeline Doctor
-- Status
-- Severity
-- Issue summary
-- Root cause
-- Suggested fix
+---
 
-## Interview explanation
+## Running the Pipeline
 
-Say this:
+```bash
+# Start all Docker services (Kafka, PostgreSQL, Airflow, Kafka UI)
+docker compose up -d
 
-> I built an AI-powered e-commerce operations monitor. Kafka streams live orders, payments, deliveries, refunds, and complaints. PostgreSQL stores raw live data, Airflow orchestrates the batch movement into Snowflake, dbt transforms and tests the data, and an AI Pipeline Doctor analyzes data quality, business anomalies, and pipeline logs to suggest root causes and fixes. The final dashboard shows both business health and pipeline health.
+# Terminal 1 — Event producer
+python -m producers.ecommerce_event_producer
 
-## Next improvements
+# Terminal 2 — Kafka consumer
+python -m consumers.kafka_to_postgres_consumer
 
-- Add AWS S3 instead of local CSV export
-- Add Kafka lag monitoring
-- Add Great Expectations data quality checks
-- Add Streamlit live dashboard
-- Add automatic GitHub issue creation when AI detects critical failure
+# Load to Snowflake
+python loaders/snowflake_loader.py
+
+# Transform with dbt
+cd dbt_project
+dbt run && dbt test
+
+# Backup to S3
+python loaders/s3_backup.py
+
+# Trigger Airflow DAG manually
+docker exec airflow-scheduler airflow dags trigger ecommerce_ops_pipeline
+```
+
+**Airflow UI:** http://localhost:8080 `admin / admin`
+**Kafka UI:** http://localhost:8085
+
+---
+
+## Power BI Dashboard
+
+Connect Power BI directly to Snowflake:
+
+```
+Server:    <account>.snowflakecomputing.com
+Warehouse: ECOMMERCE_WH
+Database:  ECOMMERCE_OPS_DB
+```
+
+**Page 1 — Executive Overview**
+Total orders, revenue trend, cancellation rate, overall pipeline status
+
+**Page 2 — Operations Health**
+Payment failure rate by method, delivery delay heatmap by city, complaint severity breakdown
+
+**Page 3 — AI Diagnosis Insights**
+Pipeline health score over time, LLM vs fallback usage rate, recent diagnosis table with status and confidence
+
+---
+
+## Environment Variables
+
+See `.env.example` for the full reference. Key variables:
+
+```bash
+# Snowflake
+SNOWFLAKE_ACCOUNT=
+SNOWFLAKE_USER=
+SNOWFLAKE_PASSWORD=
+
+# PostgreSQL
+PG_HOST=localhost
+PG_PORT=5433
+
+# OpenAI
+OPENAI_API_KEY=
+
+# AWS
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+S3_BACKUP_BUCKET=
+```
+
+---
+
+## Resume Points
+
+```
+• Designed and implemented an end-to-end real-time data engineering pipeline
+  processing 5,500+ events across five operational domains using Apache Kafka,
+  PostgreSQL, and Apache Airflow with 15-minute scheduling and parallel task execution
+
+• Built an AI diagnostic engine (AI Pipeline Doctor) using GPT-4o-mini with
+  z-score anomaly detection, structured JSON output validation, alert fingerprint
+  deduplication, and a three-tier fallback chain ensuring 100% diagnosis coverage
+
+• Implemented a medallion architecture in Snowflake using dbt with 12 models
+  across staging and marts layers, validated by 69 automated data quality tests
+  covering uniqueness, nullability, and value constraints
+
+• Engineered an AWS S3 archival system serializing PostgreSQL tables to
+  date-partitioned Parquet (year/month/day), producing Athena-compatible
+  and Iceberg-ready output with per-file row count metadata
+
+• Built a three-page Power BI dashboard with live Snowflake DirectQuery
+  connection covering executive KPIs, operational health metrics, and
+  AI diagnosis trend analysis
+
+• Containerized an 8-service stack with Docker Compose including Kafka,
+  Zookeeper, PostgreSQL, Airflow webserver/scheduler/init, and Kafka UI —
+  enabling single-command local deployment
+```
+
+---
+
+
+
+## Author
+
+**Biswajit Panda**
+Data Engineer
+
+[GitHub](https://github.com/raj98612002) · [LinkedIn](https://linkedin.com/in/your-profile)
